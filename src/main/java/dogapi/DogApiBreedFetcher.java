@@ -1,5 +1,6 @@
 package dogapi;
 
+import okhttp3.HttpUrl;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
@@ -30,6 +31,50 @@ public class DogApiBreedFetcher implements BreedFetcher {
         //      to refer to the examples of using OkHttpClient from the last lab,
         //      as well as the code for parsing JSON responses.
         // return statement included so that the starter code can compile and run.
-        return new ArrayList<>();
+        if (breed == null || breed.trim().isEmpty()) {
+            throw new BreedNotFoundException(String.valueOf(breed));
+        }
+
+        final String normalized = breed.trim().toLowerCase(Locale.ROOT);
+
+        HttpUrl url = new HttpUrl.Builder()
+                .scheme("https")
+                .host("dog.ceo")
+                .addPathSegment("api")
+                .addPathSegment("breed")
+                .addPathSegment(normalized)
+                .addPathSegment("list")
+                .build();
+
+        Request request = new Request.Builder()
+                .url(String.valueOf(url))
+                .get()
+                .header("Accept", "application/json")
+                .build();
+
+        try (Response response = client.newCall(request).execute()) {
+            if (response.body() == null) {
+                throw new BreedNotFoundException(breed);
+            }
+
+            String payload = response.body().string();
+            JSONObject json = new JSONObject(payload);
+
+            String status = json.optString("status", "");
+            if (!response.isSuccessful() || !"success".equalsIgnoreCase(status)) {
+                throw new BreedNotFoundException(breed);
+            }
+
+            JSONArray msg = json.optJSONArray("message");
+
+            List<String> result = new ArrayList<>(msg.length());
+            for (int i = 0; i < msg.length(); i++) {
+                result.add(msg.getString(i));
+            }
+            Collections.sort(result);
+            return result;
+        } catch (IOException | RuntimeException e) {
+            throw new BreedNotFoundException(breed);
+        }
     }
 }
